@@ -20,4 +20,4 @@ typing_extensions==4.14.1
 urllib3==2.5.0
 gunicorn>=21,<23
 whitenoise>=6.9.0
-
+dj-database-url>=2
