@@ -1,4 +1,4 @@
-import os
+import os, re
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
@@ -9,7 +9,23 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-secret")
 DEBUG = os.environ.get("DEBUG", "False") == "True"
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost").split(",")
+
+raw_hosts = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1")
+ALLOWED_HOSTS = [
+    h for h in
+    (x.strip().strip('",;') for x in re.split(r"[,\s]+", raw_hosts))
+    if h
+]
+
+if ".onrender.com" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(".onrender.com")
+
+CSRF_TRUSTED_ORIGINS = [
+    f"https://{h.lstrip('.')}" for h in ALLOWED_HOSTS
+    if not h.startswith("*") and not h.startswith(".")
+] + [
+    "https://*.onrender.com"
+]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
