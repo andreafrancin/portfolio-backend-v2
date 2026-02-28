@@ -10,7 +10,7 @@ class ProjectImageInline(SortableInlineAdminMixin, admin.TabularInline):
 
 @admin.register(Project)
 class ProjectAdmin(SortableAdminMixin, admin.ModelAdmin):
-    list_display = ('id', 'title', 'order', 'short_content', 'content_source_lang')
+    list_display = ('id', 'title', 'order', 'hidden', 'short_content', 'content_source_lang')
     ordering = ('order',)
     inlines = [ProjectImageInline]
 

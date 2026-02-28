@@ -18,6 +18,7 @@ class Project(models.Model):
     title_i18n = models.JSONField(default=dict, blank=True)
     content_i18n = models.JSONField(default=dict, blank=True)
     order = models.PositiveIntegerField(default=0, db_index=True)
+    hidden = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['order', 'id']
@@ -49,6 +50,7 @@ class ProjectImage(models.Model):
     image = models.ImageField(storage=S3Boto3Storage(), upload_to=project_image_upload_to)
     caption = models.CharField(max_length=255, blank=True)
     order = models.PositiveIntegerField(default=0)
+    is_cover = models.BooleanField(default=False)
     hash = models.CharField(max_length=64, blank=True, editable=False)
 
     image_low = models.ImageField(

@@ -29,9 +29,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
 
     def perform_create(self, serializer):
-        max_order = Project.objects.aggregate(models.Max('order'))['order__max']
-        next_order = (max_order + 1) if max_order is not None else 0
-        serializer.save(order=next_order)
+        Project.objects.update(order=models.F('order') + 1)
+        serializer.save(order=0)
 
     @action(detail=False, methods=['post'])
     def reorder(self, request):

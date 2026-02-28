@@ -1,11 +1,20 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import About, Contact
+from .models import About, AboutImage, Contact
+
+
+class AboutImageInline(admin.TabularInline):
+    model = AboutImage
+    extra = 0
+    fields = ("image", "caption", "order", "is_cover")
+    readonly_fields = ()
+
 
 @admin.register(About)
 class AboutAdmin(admin.ModelAdmin):
     list_display = ("id", "image_preview", "langs_title", "langs_content", "updated_at")
     readonly_fields = ("image_preview",)
+    inlines = [AboutImageInline]
 
     def image_preview(self, obj):
         try:
