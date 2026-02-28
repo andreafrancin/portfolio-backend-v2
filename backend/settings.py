@@ -100,7 +100,7 @@ DATABASES = {
     "default": dj_database_url.config(
         env="DATABASE_URL",
         conn_max_age=600,
-        ssl_require=not DEBUG,
+        ssl_require=True,
     )
 }
 
@@ -131,10 +131,8 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(hours=2),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=14),
-    "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": False,
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
 }
 
 # AWS S3 CONFIG
