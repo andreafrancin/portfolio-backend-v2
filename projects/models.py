@@ -10,6 +10,28 @@ from django.core.files.base import ContentFile
 from PIL import Image, ImageFilter
 
 
+class Category(models.Model):
+    """A discipline used by the public filters (Illustration, Branding...), editable in the admin."""
+    slug = models.SlugField(max_length=64, unique=True)
+    name_i18n = models.JSONField(default=dict, blank=True)  # {"es": ..., "ca": ..., "en": ...}
+    color = models.CharField(max_length=16, default='#bc0e4d')
+    order = models.PositiveIntegerField(default=0, db_index=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return self.name_i18n.get('es') or self.slug
+
+    def delete(self, *args, **kwargs):
+        """Remove the slug from every project that uses it before deleting the category."""
+        for project in Project.objects.all().only('id', 'categories'):
+            if self.slug in (project.categories or []):
+                project.categories = [c for c in project.categories if c != self.slug]
+                project.save(update_fields=['categories'])
+        super().delete(*args, **kwargs)
+
+
 class Project(models.Model):
     title = models.CharField(max_length=255)
 
@@ -19,6 +41,16 @@ class Project(models.Model):
     content_i18n = models.JSONField(default=dict, blank=True)
     order = models.PositiveIntegerField(default=0, db_index=True)
     hidden = models.BooleanField(default=False)
+    # Slugs of Category rows (public filters)
+    categories = models.JSONField(default=list, blank=True)
+    # Optional project suggested at the end of this one ("Next project"); chosen in the admin
+    suggested_project = models.ForeignKey(
+        'self',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+    )
 
     class Meta:
         ordering = ['order', 'id']

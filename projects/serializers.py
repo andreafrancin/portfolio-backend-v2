@@ -1,6 +1,7 @@
+from django.utils.text import slugify
 from rest_framework import serializers
 from django.core.files.base import ContentFile
-from .models import Project, ProjectImage
+from .models import Project, ProjectImage, Category
 import hashlib
 import base64
 import uuid
@@ -85,8 +86,53 @@ class ProjectImageSerializer(serializers.ModelSerializer):
         return instance
 
 
+class CategorySerializer(serializers.ModelSerializer):
+    slug = serializers.SlugField(max_length=64, required=False)
+
+    class Meta:
+        model = Category
+        fields = ['id', 'slug', 'name_i18n', 'color', 'order']
+        read_only_fields = ['id']
+
+    def validate_color(self, value):
+        import re
+        if not re.fullmatch(r'#[0-9a-fA-F]{6}', value or ''):
+            raise serializers.ValidationError('Use a hex colour like #bc0e4d.')
+        return value.lower()
+
+    def validate_name_i18n(self, value):
+        if not isinstance(value, dict) or not any(str(v).strip() for v in value.values()):
+            raise serializers.ValidationError('Add a name in at least one language.')
+        return {k: str(v).strip() for k, v in value.items() if k in ('es', 'ca', 'en')}
+
+    def create(self, validated_data):
+        # The slug is fixed once created (projects reference it); derive it from the name
+        base = slugify(validated_data.get('slug') or next(
+            (validated_data['name_i18n'].get(k) for k in ('en', 'es', 'ca') if validated_data['name_i18n'].get(k)), 'category'
+        )) or 'category'
+        slug, n = base, 2
+        while Category.objects.filter(slug=slug).exists():
+            slug, n = f'{base}-{n}', n + 1
+        validated_data['slug'] = slug
+        if 'order' not in validated_data:
+            last = Category.objects.order_by('-order').first()
+            validated_data['order'] = (last.order + 1) if last else 0
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        validated_data.pop('slug', None)
+        return super().update(instance, validated_data)
+
+
+
 class ProjectSerializer(serializers.ModelSerializer):
     images = ProjectImageSerializer(many=True)
+    categories = serializers.ListField(child=serializers.CharField(), required=False)
+    suggested_project = serializers.PrimaryKeyRelatedField(
+        queryset=Project.objects.all(),
+        required=False,
+        allow_null=True,
+    )
     images_to_remove = serializers.ListField(
         child=serializers.IntegerField(),
         required=False,
@@ -109,9 +155,18 @@ class ProjectSerializer(serializers.ModelSerializer):
             'title_resolved', 'content_resolved',
             'order',
             'hidden',
+            'categories',
+            'suggested_project',
             'images', 'images_to_remove',
         ]
         read_only_fields = ['id', 'order', 'title_resolved', 'content_resolved']
+
+    def validate_categories(self, value):
+        known = set(Category.objects.values_list('slug', flat=True))
+        unknown = [v for v in value if v not in known]
+        if unknown:
+            raise serializers.ValidationError(f'Unknown categories: {", ".join(unknown)}')
+        return list(dict.fromkeys(value))
 
     # ---------- language helpers ----------
     def _resolve_lang(self):
@@ -177,6 +232,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             content_source_lang=validated_data.get('content_source_lang', 'en'),
             order=validated_data.get('order', 0),
             hidden=validated_data.get('hidden', False),
+            categories=validated_data.get('categories', []),
+            suggested_project=validated_data.get('suggested_project'),
             title_i18n=self._merge_dicts({}, title_i18n_in),
             content_i18n=self._merge_dicts({}, content_i18n_in),
         )
@@ -212,6 +269,12 @@ class ProjectSerializer(serializers.ModelSerializer):
             instance.content_source_lang = validated_data['content_source_lang']
         if 'hidden' in validated_data:
             instance.hidden = validated_data['hidden']
+        if 'categories' in validated_data:
+            instance.categories = list(dict.fromkeys(validated_data['categories']))
+        if 'suggested_project' in validated_data:
+            suggested = validated_data['suggested_project']
+            # A project cannot suggest itself
+            instance.suggested_project = None if suggested and suggested.pk == instance.pk else suggested
 
         if 'title_i18n' in validated_data:
             instance.title_i18n = self._merge_dicts(instance.title_i18n, validated_data['title_i18n'])

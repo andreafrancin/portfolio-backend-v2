@@ -1,9 +1,10 @@
 from rest_framework.routers import DefaultRouter
 from django.urls import path
-from .views import ProjectViewSet, ProjectImageUploadView
+from .views import CategoryViewSet, ProjectViewSet, ProjectImageUploadView
 
 router = DefaultRouter()
 router.register(r'projects', ProjectViewSet, basename='project')
+router.register(r'categories', CategoryViewSet, basename='category')
 
 urlpatterns = router.urls
 

@@ -5,8 +5,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
-from .models import Project
-from .serializers import ProjectSerializer
+from .models import Category, Project
+from .serializers import CategorySerializer, ProjectSerializer
 from .services.aws_s3 import handle_image_upload
 
 
@@ -79,3 +79,35 @@ class ProjectImageUploadView(APIView):
             return Response({'new_image': new_image_key}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class CategoryViewSet(viewsets.ModelViewSet):
+    """
+    Endpoints:
+    - GET    /categories/          → List categories (public: used by the filters)
+    - POST   /categories/          → Create one
+    - PUT    /categories/{id}/     → Modify one (its slug never changes)
+    - DELETE /categories/{id}/     → Remove one (also removed from every project)
+    - POST   /categories/reorder/  → Change their order
+    """
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+    @action(detail=False, methods=['post'])
+    def reorder(self, request):
+        order_list = request.data.get('order')
+        if not isinstance(order_list, list):
+            return Response({"error": "Field 'order' must be a list of IDs"}, status=status.HTTP_400_BAD_REQUEST)
+        items = {c.id: c for c in Category.objects.filter(id__in=order_list)}
+        if set(order_list) != set(items):
+            return Response({"error": "The list of IDs does not match existing categories"}, status=status.HTTP_400_BAD_REQUEST)
+        with transaction.atomic():
+            for idx, cid in enumerate(order_list):
+                items[cid].order = idx
+            Category.objects.bulk_update(items.values(), ['order'])
+        return Response({"status": "Order updated."})

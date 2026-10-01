@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "auth_app",
     "projects",
     "pages",
+    "billing",
     "storages",
     "adminsortable2",
 ]
