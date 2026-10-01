@@ -208,3 +208,4 @@ class ProjectImage(models.Model):
             storage.delete(file_name)
         if low_storage and low_file_name:
             low_storage.delete(low_file_name)
+

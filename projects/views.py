@@ -20,7 +20,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     - DELETE /projects/{id}/       → Remove a project
     - POST   /projects/reorder/    → Change projects order
     """
-    queryset = Project.objects.all()
+    queryset = Project.objects.prefetch_related('images')
     serializer_class = ProjectSerializer
 
     def get_permissions(self):
@@ -59,6 +59,47 @@ class ProjectViewSet(viewsets.ModelViewSet):
             Project.objects.bulk_update(updated, ['order'])
 
         return Response({"status": "Order updated."})
+
+
+    @action(detail=False, methods=['post'])
+    def bulk_categories(self, request):
+        ids = request.data.get('ids')
+        add = request.data.get('add', [])
+        remove = request.data.get('remove', [])
+        if (
+            not isinstance(ids, list) or not ids
+            or not all(isinstance(i, int) for i in ids)
+            or not isinstance(add, list) or not isinstance(remove, list)
+        ):
+            return Response(
+                {"error": "Send 'ids' (non-empty list of project IDs) and 'add' / 'remove' (lists of category slugs)"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ordered = list(Category.objects.values_list('slug', flat=True))
+        unknown = [slug for slug in [*add, *remove] if slug not in ordered]
+        if unknown:
+            return Response(
+                {"error": f"Unknown categories: {', '.join(map(str, unknown))}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        projects = list(Project.objects.filter(id__in=ids))
+        if len(projects) != len(set(ids)):
+            return Response(
+                {"error": "Some projects do not exist"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        to_add, to_remove = set(add), set(remove) - set(add)
+        for project in projects:
+            current = (set(project.categories or []) | to_add) - to_remove
+            project.categories = [slug for slug in ordered if slug in current]
+
+        with transaction.atomic():
+            Project.objects.bulk_update(projects, ['categories'])
+
+        return Response({p.id: p.categories for p in projects})
 
 
 class ProjectImageUploadView(APIView):
