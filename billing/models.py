@@ -50,7 +50,10 @@ class Client(models.Model):
 class Condition(models.Model):
     """A reusable conditions paragraph for quotes ("Condicions"), picked in the editor."""
     title = models.CharField(max_length=255)
+    # The text in the default language (Catalan); kept in sync with text_i18n['ca']
     text = models.TextField(blank=True, default='')
+    # {"ca": ..., "es": ..., "en": ...}: the editor picks the one matching the document language
+    text_i18n = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

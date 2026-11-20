@@ -245,6 +245,24 @@ class ConditionTests(BillingAPITestCase):
         r = self.client.post('/api/billing/conditions/', {'text': 'x'}, format='json')
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_texts_per_language_stay_in_sync_with_text(self):
+        url = '/api/billing/conditions/'
+        r = self.client.post(
+            url, {'title': 'Web', 'text_i18n': {'ca': 'Condicions', 'en': 'Terms', 'es': ' ', 'fr': 'x'}}, format='json'
+        )
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.data['text_i18n'], {'ca': 'Condicions', 'en': 'Terms'})
+        self.assertEqual(r.data['text'], 'Condicions')
+
+        r = self.client.patch(f"{url}{r.data['id']}/", {'text': 'Condicions noves'}, format='json')
+        self.assertEqual(r.data['text_i18n'], {'ca': 'Condicions noves', 'en': 'Terms'})
+
+        r = self.client.post(url, {'title': 'Only English', 'text_i18n': {'en': 'Terms'}}, format='json')
+        self.assertEqual(r.data['text'], 'Terms')
+
+        r = self.client.post(url, {'title': 'Old client', 'text': 'Text'}, format='json')
+        self.assertEqual(r.data['text_i18n'], {'ca': 'Text'})
+
     def test_auth_required(self):
         anon = APIClient(HTTP_HOST='localhost')
         self.assertEqual(anon.get('/api/billing/conditions/').status_code, status.HTTP_401_UNAUTHORIZED)

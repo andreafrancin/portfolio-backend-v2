@@ -24,11 +24,40 @@ class ClientSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 
+CONDITION_LANGUAGES = ('ca', 'es', 'en')
+CONDITION_DEFAULT_LANGUAGE = 'ca'
+
+
 class ConditionSerializer(serializers.ModelSerializer):
+    text_i18n = serializers.JSONField(required=False)
+
     class Meta:
         model = Condition
-        fields = ['id', 'title', 'text', 'created_at', 'updated_at']
+        fields = ['id', 'title', 'text', 'text_i18n', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def validate_text_i18n(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError('Send an object with one text per language.')
+        return {
+            lang: str(value[lang])
+            for lang in CONDITION_LANGUAGES
+            if str(value.get(lang) or '').strip()
+        }
+
+    def validate(self, attrs):
+        # `text` and text_i18n[default] always hold the same text, whichever one the client sends
+        if 'text_i18n' in attrs:
+            texts = attrs['text_i18n']
+            attrs['text'] = texts.get(CONDITION_DEFAULT_LANGUAGE) or next(iter(texts.values()), '')
+        elif 'text' in attrs:
+            texts = dict(self.instance.text_i18n or {}) if self.instance else {}
+            if attrs['text'].strip():
+                texts[CONDITION_DEFAULT_LANGUAGE] = attrs['text']
+            else:
+                texts.pop(CONDITION_DEFAULT_LANGUAGE, None)
+            attrs['text_i18n'] = texts
+        return attrs
 
 
 class DocumentSerializer(serializers.ModelSerializer):
