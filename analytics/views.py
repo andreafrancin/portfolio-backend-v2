@@ -6,10 +6,10 @@ from rest_framework import status
 from rest_framework.parsers import BaseParser, JSONParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.throttling import SimpleRateThrottle
 from rest_framework.views import APIView
 
 from . import geo, tracking
+from .net import ClientIPScopedThrottle, client_ip
 from .models import AnalyticsSettings
 from .report import build_report
 
@@ -30,16 +30,9 @@ class PlainTextJSONParser(BaseParser):
 
 
 def visitor_origin(request) -> tuple[str, str]:
-    """The visitor's IP (as seen through NUM_PROXIES proxies) and its country, looked up here."""
-    ip = VisitorThrottle().get_ident(request)
+    """The visitor's IP (never stored) and its country, looked up on this server."""
+    ip, _ = client_ip(request)
     return ip, geo.country_of(ip)
-
-
-class VisitorThrottle(SimpleRateThrottle):
-    scope = "analytics"
-
-    def get_cache_key(self, request, view):
-        return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
 
 
 class CollectView(APIView):
@@ -50,7 +43,8 @@ class CollectView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
     parser_classes = [PlainTextJSONParser, JSONParser]
-    throttle_classes = [VisitorThrottle]
+    throttle_classes = [ClientIPScopedThrottle]
+    throttle_scope = "analytics"
 
     def post(self, request):
         data = request.data if isinstance(request.data, dict) else {}
@@ -111,3 +105,16 @@ class SettingsView(APIView):
         settings_record.hidden_sections = [s for s in SECTIONS if s in hidden]
         settings_record.save(update_fields=["hidden_sections"])
         return Response({"hidden_sections": settings_record.hidden_sections, "sections": SECTIONS})
+
+
+class ConnectionView(APIView):
+    """
+    Endpoint (private):
+    - GET /analytics/connection/  → The country of the signed-in person's own connection, and which
+      header the IP was read from, so it can be checked that visits are located correctly.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        ip, source = client_ip(request)
+        return Response({"country": geo.country_of(ip), "source": source})

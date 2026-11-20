@@ -192,6 +192,9 @@ EMAIL_BACKEND = (
 DEFAULT_FROM_EMAIL = _env("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or CONTACT_FROM_EMAIL)
 
 REST_FRAMEWORK["NUM_PROXIES"] = int(_env("NUM_PROXIES", "1"))
+# Header holding the visitor's IP, set by the proxy in front (Cloudflare, in front of Render). When it
+# is missing, X-Forwarded-For is read with NUM_PROXIES. Set to an empty value to never use a header.
+CLIENT_IP_HEADER = os.environ.get("CLIENT_IP_HEADER", "CF-Connecting-IP")
 REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
     "contact": _env("CONTACT_RATE", "5/hour"),
     "analytics": _env("ANALYTICS_RATE", "240/hour"),

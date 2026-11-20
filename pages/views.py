@@ -5,7 +5,7 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
+from analytics.net import ClientIPScopedThrottle
 from rest_framework.views import APIView
 from zoneinfo import ZoneInfo
 
@@ -125,7 +125,7 @@ class ContactMessageView(APIView):
     """
     permission_classes = [AllowAny]
     authentication_classes = []
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ClientIPScopedThrottle]
     throttle_scope = 'contact'
 
     def post(self, request):
