@@ -1,7 +1,7 @@
 # pages/serializers.py
 from rest_framework import serializers
 from django.core.files.base import ContentFile
-from .models import About, AboutImage, Contact
+from .models import About, AboutImage, AutoReply, Contact, Service, ServiceGroup
 import hashlib
 import base64
 import uuid
@@ -215,3 +215,113 @@ class ContactSerializer(serializers.ModelSerializer):
 
         instance.save()
         return instance
+
+
+LANGS = ('es', 'ca', 'en')
+
+
+def clean_i18n(value, required):
+    if not isinstance(value, dict):
+        raise serializers.ValidationError('Expected an object keyed by language.')
+    cleaned = {k: str(v).strip() for k, v in value.items() if k in LANGS and str(v or '').strip()}
+    if required and not cleaned:
+        raise serializers.ValidationError('Add a name in at least one language.')
+    return cleaned
+
+
+class ServiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Service
+        fields = ['id', 'group', 'name_i18n', 'description_i18n', 'order']
+        read_only_fields = ['id']
+
+    def validate_name_i18n(self, value):
+        return clean_i18n(value, required=True)
+
+    def validate_description_i18n(self, value):
+        return clean_i18n(value, required=False)
+
+    def create(self, validated_data):
+        if 'order' not in validated_data:
+            last = validated_data['group'].services.order_by('-order').first()
+            validated_data['order'] = (last.order + 1) if last else 0
+        return super().create(validated_data)
+
+
+class ServiceGroupSerializer(serializers.ModelSerializer):
+    services = ServiceSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ServiceGroup
+        fields = ['id', 'name_i18n', 'order', 'services']
+        read_only_fields = ['id']
+
+    def validate_name_i18n(self, value):
+        return clean_i18n(value, required=True)
+
+    def create(self, validated_data):
+        if 'order' not in validated_data:
+            last = ServiceGroup.objects.order_by('-order').first()
+            validated_data['order'] = (last.order + 1) if last else 0
+        return super().create(validated_data)
+
+
+class ContactMessageSerializer(serializers.Serializer):
+    """A message from the public contact form. It is emailed and never saved."""
+    name = serializers.CharField(max_length=120, trim_whitespace=True)
+    email = serializers.EmailField(max_length=254)
+    service = serializers.CharField(max_length=200, required=False, allow_blank=True, trim_whitespace=True)
+    message = serializers.CharField(min_length=10, max_length=5000, trim_whitespace=True)
+    consent = serializers.BooleanField()
+    language = serializers.ChoiceField(choices=LANGS, required=False, default='es')
+    # Hidden from people; bots that fill every field reveal themselves here.
+    website = serializers.CharField(required=False, allow_blank=True, max_length=200)
+
+    def validate_consent(self, value):
+        if value is not True:
+            raise serializers.ValidationError('The privacy policy must be accepted.')
+        return value
+
+    def validate_name(self, value):
+        if '\n' in value or '\r' in value:
+            raise serializers.ValidationError('The name must be on one line.')
+        return value
+
+    def validate_service(self, value):
+        if '\n' in value or '\r' in value:
+            raise serializers.ValidationError('The service must be on one line.')
+        return value
+
+
+AUTO_REPLY_LIMITS = {
+    'subject_i18n': 150,
+    'greeting_i18n': 120,
+    'greeting_anonymous_i18n': 120,
+    'body_i18n': 3000,
+    'button_i18n': 40,
+    'signature_i18n': 200,
+}
+
+
+class AutoReplySerializer(serializers.ModelSerializer):
+    defaults = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AutoReply
+        fields = ['enabled', *AUTO_REPLY_LIMITS, 'defaults', 'updated_at']
+        read_only_fields = ['defaults', 'updated_at']
+
+    def get_defaults(self, obj):
+        from .contact_emails import default_auto_reply
+        return {lang: default_auto_reply(lang) for lang in LANGS}
+
+    def validate(self, attrs):
+        for field, limit in AUTO_REPLY_LIMITS.items():
+            if field not in attrs:
+                continue
+            cleaned = clean_i18n(attrs[field], required=False)
+            too_long = [lang for lang, value in cleaned.items() if len(value) > limit]
+            if too_long:
+                raise serializers.ValidationError({field: f'Keep it under {limit} characters.'})
+            attrs[field] = cleaned
+        return attrs

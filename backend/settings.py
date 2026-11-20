@@ -158,3 +158,37 @@ AWS_S3_OBJECT_PARAMETERS = {
 # Tell Django to use S3 for file storage
 DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+def _env(name, default=""):
+    """An empty value in .env counts as not set, so the default still applies."""
+    return os.environ.get(name) or default
+
+
+# CONTACT FORM
+# Messages from the public contact form are emailed to CONTACT_RECIPIENT, never stored, and the
+# visitor gets a confirmation. Replies always go to CONTACT_REPLY_TO (andfrancin@gmail.com by default).
+# With RESEND_API_KEY they go through Resend's HTTPS API; otherwise through Django's email
+# backend (SMTP when EMAIL_HOST is set, printed to the console when it is not).
+CONTACT_RECIPIENT = _env("CONTACT_RECIPIENT", "andfrancin@gmail.com")
+CONTACT_FROM_EMAIL = _env("CONTACT_FROM_EMAIL", "Andrea Francín web <onboarding@resend.dev>")
+RESEND_API_KEY = _env("RESEND_API_KEY", "")
+# Where a visitor's reply to the confirmation email goes.
+CONTACT_REPLY_TO = _env("CONTACT_REPLY_TO", CONTACT_RECIPIENT)
+# Send the visitor a confirmation. It only goes out from a verified domain, never Resend's test sender.
+CONTACT_SEND_CONFIRMATION = _env("CONTACT_SEND_CONFIRMATION", "True") == "True"
+
+EMAIL_HOST = _env("EMAIL_HOST", "")
+EMAIL_PORT = int(_env("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = _env("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = _env("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = _env("EMAIL_USE_TLS", "True") == "True"
+EMAIL_TIMEOUT = 15
+EMAIL_BACKEND = (
+    "django.core.mail.backends.smtp.EmailBackend"
+    if EMAIL_HOST
+    else "django.core.mail.backends.console.EmailBackend"
+)
+DEFAULT_FROM_EMAIL = _env("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or CONTACT_FROM_EMAIL)
+
+REST_FRAMEWORK["NUM_PROXIES"] = int(_env("NUM_PROXIES", "1"))
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {"contact": _env("CONTACT_RATE", "5/hour")}

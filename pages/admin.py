@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import About, AboutImage, Contact
+from .models import About, AboutImage, AutoReply, Contact, Service, ServiceGroup
 
 
 class AboutImageInline(admin.TabularInline):
@@ -44,3 +44,20 @@ class ContactAdmin(admin.ModelAdmin):
     def langs_desc(self, obj):
         return ", ".join(sorted(obj.description_i18n.keys())) if obj.description_i18n else "-"
     langs_desc.short_description = "Description langs"
+
+
+class ServiceInline(admin.StackedInline):
+    model = Service
+    extra = 0
+    fields = ("name_i18n", "description_i18n", "order")
+
+
+@admin.register(ServiceGroup)
+class ServiceGroupAdmin(admin.ModelAdmin):
+    list_display = ("id", "__str__", "order")
+    inlines = [ServiceInline]
+
+
+@admin.register(AutoReply)
+class AutoReplyAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "enabled", "updated_at")

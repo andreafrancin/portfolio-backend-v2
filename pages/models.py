@@ -214,3 +214,54 @@ def delete_about_image_on_delete(sender, instance: About, **kwargs):
             file.delete(save=False)
         except Exception:
             pass
+
+
+class ServiceGroup(models.Model):
+    """A heading on the services page (Branding, Illustration...) that holds several services."""
+    name_i18n = models.JSONField(default=dict, blank=True)
+    order = models.PositiveIntegerField(default=0, db_index=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return self.name_i18n.get('es') or f"Service group {self.pk}"
+
+
+class Service(models.Model):
+    group = models.ForeignKey(ServiceGroup, related_name='services', on_delete=models.CASCADE)
+    name_i18n = models.JSONField(default=dict, blank=True)
+    description_i18n = models.JSONField(default=dict, blank=True)
+    order = models.PositiveIntegerField(default=0, db_index=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return self.name_i18n.get('es') or f"Service {self.pk}"
+
+
+class AutoReply(models.Model):
+    """The confirmation a visitor receives after sending the contact form, editable in the back office.
+
+    Every text is per language; an empty one falls back to the built-in wording.
+    """
+    enabled = models.BooleanField(default=True)
+    subject_i18n = models.JSONField(default=dict, blank=True)
+    greeting_i18n = models.JSONField(default=dict, blank=True)
+    greeting_anonymous_i18n = models.JSONField(default=dict, blank=True)
+    body_i18n = models.JSONField(default=dict, blank=True)
+    button_i18n = models.JSONField(default=dict, blank=True)
+    signature_i18n = models.JSONField(default=dict, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Auto reply"
+        verbose_name_plural = "Auto reply"
+
+    def __str__(self):
+        return "Contact form auto reply"
+
+    @classmethod
+    def load(cls) -> "AutoReply":
+        return cls.objects.order_by('id').first() or cls.objects.create()
