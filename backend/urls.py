@@ -18,6 +18,8 @@ from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import RedirectView
 
+from analytics.views import CollectView
+
 urlpatterns = [
     path('', RedirectView.as_view(pattern_name='admin:index', permanent=False)),
     path('admin/', admin.site.urls),
@@ -25,4 +27,6 @@ urlpatterns = [
     path('api/', include('projects.urls')),
     path('api/', include('pages.urls')),
     path('api/billing/', include('billing.urls')),
+    path('api/analytics/', include('analytics.urls')),
+    path('api/v/', CollectView.as_view(), name='visit'),
 ]

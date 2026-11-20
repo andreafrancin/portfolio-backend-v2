@@ -11,3 +11,4 @@ __pycache__/
 *.py[cod]
 *.pyo
 local_media/
+geoip/

@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "projects",
     "pages",
     "billing",
+    "analytics",
     "storages",
     "adminsortable2",
 ]
@@ -191,4 +192,14 @@ EMAIL_BACKEND = (
 DEFAULT_FROM_EMAIL = _env("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or CONTACT_FROM_EMAIL)
 
 REST_FRAMEWORK["NUM_PROXIES"] = int(_env("NUM_PROXIES", "1"))
-REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {"contact": _env("CONTACT_RATE", "5/hour")}
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
+    "contact": _env("CONTACT_RATE", "5/hour"),
+    "analytics": _env("ANALYTICS_RATE", "240/hour"),
+}
+
+# ANALYTICS
+# Anonymous, cookie-free visit counting. Raw visits are kept this many days.
+ANALYTICS_RETENTION_DAYS = int(_env("ANALYTICS_RETENTION_DAYS", "400"))
+# Country database (DB-IP "IP to Country Lite", CC BY 4.0), downloaded at deploy time with
+# `python manage.py download_geoip`.
+ANALYTICS_GEOIP_PATH = Path(_env("ANALYTICS_GEOIP_PATH", str(BASE_DIR / "geoip" / "dbip-country-lite.mmdb")))
